@@ -197,11 +197,14 @@ def load_model(device, model_path, model_type="dpt_large_384", optimize=True, he
     else:
         print(f"model_type '{model_type}' not implemented, use: --model_type large")
         assert False
+    
+    from ptflops import get_model_complexity_info
+    macs, params = get_model_complexity_info(model, (3, 384, 384), as_strings=True, print_per_layer_stat=False, verbose=False)
 
     if not "openvino" in model_type:
-        print("Model loaded, number of parameters = {:.0f}M".format(sum(p.numel() for p in model.parameters()) / 1e6))
+        print(f"Model {model_type} loaded, MACs = {macs}, params = {params}, number of parameters = {(sum(p.numel() for p in model.parameters()) / 1e6):.0f}M")
     else:
-        print("Model loaded, optimized with OpenVINO")
+        print(f"Model {model_type} loaded, optimized with OpenVINO")
 
     if "openvino" in model_type:
         keep_aspect_ratio = False

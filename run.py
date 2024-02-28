@@ -7,6 +7,7 @@ import utils
 import cv2
 import argparse
 import time
+import tw
 
 import numpy as np
 
@@ -127,7 +128,12 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
 
     # get input
     if input_path is not None:
-        image_names = glob.glob(os.path.join(input_path, "*"))
+        #image_names = glob.glob(os.path.join(input_path, "*"))
+        image_names = []
+        for root, dirs, files in os.walk(input_path):
+            for file in files:
+                inpth = os.path.join(root, file)
+                image_names.append(inpth)
         num_images = len(image_names)
     else:
         print("No input path specified. Grabbing images from camera.")
@@ -145,28 +151,80 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
 
             print("  Processing {} ({}/{})".format(image_name, index + 1, num_images))
 
-            # input
-            original_image_rgb = utils.read_image(image_name)  # in [0, 1]
-            image = transform({"image": original_image_rgb})["image"]
+            if image_name.endswith(".jpg") or image_name.endswith(".png"):
+                # input
+                original_image_rgb = utils.read_image(image_name)  # in [0, 1]
+                image = transform({"image": original_image_rgb})["image"]
 
-            # compute
-            with torch.no_grad():
-                prediction = process(device, model, model_type, image, (net_w, net_h), original_image_rgb.shape[1::-1],
-                                     optimize, False)
+                # compute    
+                torch.cuda.synchronize()
+                start = time.time()
+                with torch.no_grad():
+                    prediction = process(device, model, model_type, image, (net_w, net_h), original_image_rgb.shape[1::-1],
+                                        optimize, False)
+                torch.cuda.synchronize()
+                end = time.time()
+                print(f"infer a frame need {end-start:.05f} time, fps is {1/(end-start):2f}")
 
-            # output
-            if output_path is not None:
-                filename = os.path.join(
-                    output_path, os.path.splitext(os.path.basename(image_name))[0] + '-' + model_type
-                )
-                if not side:
-                    utils.write_depth(filename, prediction, grayscale, bits=2)
+                # output
+                if output_path is not None:
+                    filename = os.path.join(
+                        output_path, os.path.splitext(os.path.basename(image_name))[0] + '-' + model_type
+                    )
+                    if not side:
+                        utils.write_depth(filename, prediction, grayscale, bits=2)
+                    else:
+                        original_image_bgr = np.flip(original_image_rgb, 2)
+                        content = create_side_by_side(original_image_bgr*255, prediction, grayscale)
+                        cv2.imwrite(filename + ".png", content)
+                    utils.write_pfm(filename + ".pfm", prediction.astype(np.float32))
+
+            elif image_name.endswith(".mp4"):
+                video_name = image_name
+                reader = tw.media.FFmpegReader(video_name)
+
+                # cap = cv2.VideoCapture(video_name)
+                # w = int(cap.get(3))
+                # h = int(cap.get(4))
+                # fps = cap.get(5)
+
+                if output_path is not None:
+                    filename = os.path.join(
+                        output_path, os.path.splitext(os.path.basename(image_name))[0] + '-' + model_type
+                    ) + ".mp4"
+                if side:
+                    # out_video = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w*2, h))
+                    out_video = utils.VideoWriter(filename, reader.width * 2, reader.height, reader.fps, 22, reader.color_range, reader.color_space, reader.pix_fmt)
                 else:
-                    original_image_bgr = np.flip(original_image_rgb, 2)
-                    content = create_side_by_side(original_image_bgr*255, prediction, grayscale)
-                    cv2.imwrite(filename + ".png", content)
-                utils.write_pfm(filename + ".pfm", prediction.astype(np.float32))
+                    # out_video = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    out_video = utils.VideoWriter(filename, reader.width, reader.height, reader.fps, 22, reader.color_range, reader.color_space, reader.pix_fmt)
+      
+                for frame in reader:
+                # while cap.isOpened():
+                    # ret, frame = cap.read()
+                    # if ret == False:
+                    #     # print('read video error!')
+                    #     break
+                    # elif frame.shape[:2] != (h, w):
+                    #     print('Invalid frame size.')
+                    #     break
+                    
+                    original_image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0   # in [0, 1]
+                    image = transform({"image": original_image_rgb})["image"]
+                    with torch.no_grad():
+                        prediction = process(device, model, model_type, image, (net_w, net_h),
+                                         original_image_rgb.shape[1::-1], optimize, True)
 
+                    if not side:
+                        content = utils.write_depth(filename, prediction, grayscale, bits=2)
+                    else:
+                        original_image_bgr = np.flip(original_image_rgb, 2)
+                        content = create_side_by_side(original_image_bgr*255, prediction, grayscale)
+                    out_video.write(content)
+                out_video.close()
+                #     out_video.write(content.astype(np.uint8))
+                # cap.release()
+                # out_video.release()
     else:
         with torch.no_grad():
             fps = 1

@@ -196,4 +196,31 @@ def write_depth(path, depth, grayscale, bits=1):
     elif bits == 2:
         cv2.imwrite(path + ".png", out.astype("uint16"))
 
-    return
+    return out.astype("uint8")
+
+
+# import av
+import tw
+import numpy as np
+
+class VideoWriter:
+    def __init__(self, path, width, height, fps, crf, color_range, color_space, pix_fmt):
+        self.writer = tw.media.FFmpegWriter(
+            path,
+            width=width,
+            height=height,
+            fps=fps,
+            crf=crf,
+            color_range=color_range,
+            color_space=color_space,
+            pix_fmt=pix_fmt)
+    
+    def write(self, frame):
+        # frame: [H, W, C] or [H, W]
+        if frame.ndim == 2:
+            frame = np.repeat(frame[..., np.newaxis], 3, axis=2)    # convert grayscale to RGB
+        
+        self.writer.write(frame)
+                
+    def close(self):
+        self.writer.close()
