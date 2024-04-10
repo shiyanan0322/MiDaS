@@ -171,32 +171,19 @@ def write_depth(path, depth, grayscale, bits=1):
         depth (array): depth
         grayscale (bool): use a grayscale colormap?
     """
-    if not grayscale:
-        bits = 1
-
     if not np.isfinite(depth).all():
         depth=np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
         print("WARNING: Non-finite depth values present")
 
-    depth_min = depth.min()
-    depth_max = depth.max()
+    depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
+    depth = depth.astype(np.uint8)
 
-    max_val = (2**(8*bits))-1
-
-    if depth_max - depth_min > np.finfo("float").eps:
-        out = max_val * (depth - depth_min) / (depth_max - depth_min)
+    if grayscale:
+        depth = np.repeat(depth[..., np.newaxis], 3, axis=-1)
     else:
-        out = np.zeros(depth.shape, dtype=depth.dtype)
+        depth = cv2.applyColorMap(depth, cv2.COLORMAP_INFERNO)
 
-    if not grayscale:
-        out = cv2.applyColorMap(np.uint8(out), cv2.COLORMAP_INFERNO)
-
-    if bits == 1:
-        cv2.imwrite(path + ".png", out.astype("uint8"))
-    elif bits == 2:
-        cv2.imwrite(path + ".png", out.astype("uint16"))
-
-    return out.astype("uint8")
+    return depth
 
 
 # import av

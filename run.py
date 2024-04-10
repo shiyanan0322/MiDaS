@@ -183,32 +183,16 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
                 video_name = image_name
                 reader = tw.media.FFmpegReader(video_name)
 
-                # cap = cv2.VideoCapture(video_name)
-                # w = int(cap.get(3))
-                # h = int(cap.get(4))
-                # fps = cap.get(5)
-
                 if output_path is not None:
                     filename = os.path.join(
-                        output_path, os.path.splitext(os.path.basename(image_name))[0] + '-' + model_type
+                        output_path, os.path.splitext(os.path.basename(image_name))[0] + "_video_depth" #'-' + model_type
                     ) + ".mp4"
                 if side:
-                    # out_video = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w*2, h))
                     out_video = utils.VideoWriter(filename, reader.width * 2, reader.height, reader.fps, 22, reader.color_range, reader.color_space, reader.pix_fmt)
                 else:
-                    # out_video = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     out_video = utils.VideoWriter(filename, reader.width, reader.height, reader.fps, 22, reader.color_range, reader.color_space, reader.pix_fmt)
       
                 for frame in reader:
-                # while cap.isOpened():
-                    # ret, frame = cap.read()
-                    # if ret == False:
-                    #     # print('read video error!')
-                    #     break
-                    # elif frame.shape[:2] != (h, w):
-                    #     print('Invalid frame size.')
-                    #     break
-                    
                     original_image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0   # in [0, 1]
                     image = transform({"image": original_image_rgb})["image"]
                     with torch.no_grad():
@@ -222,9 +206,7 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
                         content = create_side_by_side(original_image_bgr*255, prediction, grayscale)
                     out_video.write(content)
                 out_video.close()
-                #     out_video.write(content.astype(np.uint8))
-                # cap.release()
-                # out_video.release()
+
     else:
         with torch.no_grad():
             fps = 1
@@ -312,7 +294,7 @@ if __name__ == "__main__":
                              'fed into the encoder during inference. If this parameter is not set, the aspect ratio of '
                              'images is tried to be preserved if supported by the model.'
                         )
-    parser.add_argument('--grayscale',
+    parser.add_argument('-g', '--grayscale',
                         action='store_true',
                         help='Use a grayscale colormap instead of the inferno one. Although the inferno colormap, '
                              'which is used by default, is better for visibility, it does not allow storing 16-bit '
