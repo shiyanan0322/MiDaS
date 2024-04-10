@@ -199,10 +199,18 @@ def load_model(device, model_path, model_type="dpt_large_384", optimize=True, he
         assert False
     
     from ptflops import get_model_complexity_info
+    from fvcore.nn import FlopCountAnalysis, parameter_count_table, flop_count_table
+    from thop import profile, clever_format
+
+    macs_thop, params_thop = profile(model, inputs=(torch.randn(1, 3, 384, 384),), verbose=False)
+    macs_thop, params_thop = clever_format([macs_thop, params_thop], "%.3f")
     macs, params = get_model_complexity_info(model, (3, 384, 384), as_strings=True, print_per_layer_stat=False, verbose=False)
+    # flops = FlopCountAnalysis(model, torch.randn(1, 3, 384, 384)).total()
+    # print(flop_count_table(flops))
+    # params2 = parameter_count_table(model)
 
     if not "openvino" in model_type:
-        print(f"Model {model_type} loaded, MACs = {macs}, params = {params}, number of parameters = {(sum(p.numel() for p in model.parameters()) / 1e6):.0f}M")
+        print(f"Model {model_type} loaded, MACs = {macs}, MACs_thop = {macs_thop}, params_thop = {params_thop}, number of parameters = {(sum(p.numel() for p in model.parameters()) / 1e6):.0f}M")
     else:
         print(f"Model {model_type} loaded, optimized with OpenVINO")
 
