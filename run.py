@@ -169,14 +169,15 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
                 # output
                 if output_path is not None:
                     filename = os.path.join(
-                        output_path, os.path.splitext(os.path.basename(image_name))[0]# + '-' + model_type
-                    )
+                        output_path, os.path.splitext(os.path.basename(image_name))[0] + "_depth"# + '-' + model_type
+                    ) + ".png"
                     if not side:
-                        utils.write_depth(filename, prediction, grayscale, bits=2)
+                        depth = utils.write_depth(filename, prediction, grayscale, bits=2)
+                        cv2.imwrite(filename, depth)
                     else:
                         original_image_bgr = np.flip(original_image_rgb, 2)
                         content = create_side_by_side(original_image_bgr*255, prediction, grayscale)
-                        cv2.imwrite(filename + ".png", content)
+                        cv2.imwrite(filename, content)
                     # utils.write_pfm(filename + ".pfm", prediction.astype(np.float32))
 
             elif image_name.endswith(".mp4"):
@@ -185,7 +186,7 @@ def run(input_path, output_path, model_path, model_type="dpt_beit_large_512", op
 
                 if output_path is not None:
                     filename = os.path.join(
-                        output_path, os.path.splitext(os.path.basename(image_name))[0] + "_video_depth" #'-' + model_type
+                        output_path, os.path.splitext(os.path.basename(image_name))[0] + "_depth" #'-' + model_type
                     ) + ".mp4"
                 if side:
                     out_video = utils.VideoWriter(filename, reader.width * 2, reader.height, reader.fps, 22, reader.color_range, reader.color_space, reader.pix_fmt)
